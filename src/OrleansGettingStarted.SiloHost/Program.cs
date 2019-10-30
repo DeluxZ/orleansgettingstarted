@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Hosting;
+using OrleansGettingStarted.Grains;
 using System;
 using System.Net;
 using System.Threading.Tasks;
@@ -39,6 +40,7 @@ namespace OrleansGettingStarted.SiloHost
                     options.ServiceId = "HelloWorldApp";
                 })
                 .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
+                .AddMemoryGrainStorage(Constants.OrleansMemoryProvider)
                 .ConfigureLogging(logging => logging.AddConsole());
 
             var host = builder.Build();

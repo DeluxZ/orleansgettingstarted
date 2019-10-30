@@ -20,6 +20,7 @@ namespace OrleansGettingStarted.Client
                 using (IClusterClient client = await StartClientWithRetries())
                 {
                     await DoClientWork(client);
+                    await DoStatefulWork(client);
                     Console.ReadKey();
                 }
 
@@ -45,7 +46,9 @@ namespace OrleansGettingStarted.Client
                     options.ClusterId = "dev";
                     options.ServiceId = "HelloWorldApp";
                 })
-                .ConfigureLogging(logging => logging.AddConsole())
+                //.ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IHelloWorld).Assembly).WithReferences())
+                // I don't want the chatter of logging from the client for now.
+                //.ConfigureLogging(logging => logging.AddConsole())
                 .Build();
 
             await client.Connect(RetryFilter);
@@ -68,27 +71,65 @@ namespace OrleansGettingStarted.Client
             {
                 return false;
             }
-
             await Task.Delay(TimeSpan.FromSeconds(4));
-
             return true;
         }
 
         private static async Task DoClientWork(IClusterClient client)
         {
-            Console.WriteLine("Hello, what should I call you?");
-            var name = Console.ReadLine();
+            // example of calling grains from the initialized client
+            var grain = client.GetGrain<IHelloWorld>(Guid.NewGuid());
+            var grain2 = client.GetGrain<IHelloWorld>(Guid.NewGuid());
 
-            if (string.IsNullOrEmpty(name))
+            Console.WriteLine($"{await grain.SayHello("1")}");
+            Console.WriteLine($"{await grain2.SayHello("2")}");
+            Console.WriteLine($"{await grain.SayHello("3")}");
+
+            PrintSeparatorThing();
+        }
+
+        private static async Task DoStatefulWork(IClusterClient client)
+        {
+            var kritnerGrain = client.GetGrain<IVisitTracker>("kritner@gmail.com");
+            var notKritnerGrain = client.GetGrain<IVisitTracker>("notKritner@gmail.com");
+
+            await PrettyPrintGrainVisits(kritnerGrain);
+            await PrettyPrintGrainVisits(notKritnerGrain);
+
+            PrintSeparatorThing();
+            Console.WriteLine("Ayyy some people are visiting!");
+
+            await kritnerGrain.Visit();
+            await kritnerGrain.Visit();
+            await notKritnerGrain.Visit();
+
+            PrintSeparatorThing();
+
+            await PrettyPrintGrainVisits(kritnerGrain);
+            await PrettyPrintGrainVisits(notKritnerGrain);
+
+            PrintSeparatorThing();
+            Console.Write("ayyy kritner's visiting even more!");
+
+            for (int i = 0; i < 5; i++)
             {
-                name = "anon";
+                await kritnerGrain.Visit();
             }
 
-            var grain = client.GetGrain<IHelloWorld>(Guid.NewGuid());
+            PrintSeparatorThing();
 
-            var response = await grain.SayHello(name);
+            await PrettyPrintGrainVisits(kritnerGrain);
+            await PrettyPrintGrainVisits(notKritnerGrain);
+        }
 
-            Console.WriteLine($"\n\n{response}\n\n");
+        private static async Task PrettyPrintGrainVisits(IVisitTracker grain)
+        {
+            Console.WriteLine($"{grain.GetPrimaryKeyString()} has visited {await grain.GetNumberOfVisits()} times");
+        }
+
+        private static void PrintSeparatorThing()
+        {
+            Console.WriteLine($"{Environment.NewLine}-----{Environment.NewLine}");
         }
     }
 }
